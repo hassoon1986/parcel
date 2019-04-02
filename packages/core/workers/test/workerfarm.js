@@ -177,6 +177,61 @@ describe('WorkerFarm', () => {
     await workerfarm.end();
   });
 
+  it('Forwards stdio from the child process and levels event source', async () => {
+    let events = [];
+    let logDisposable = Logger.onLog(event => events.push(event));
+
+    let workerfarm = new WorkerFarm(
+      {},
+      {
+        warmWorkers: true,
+        useLocalWorker: false,
+        workerPath: require.resolve('./integration/workerfarm/stdio.js')
+      }
+    );
+
+    await workerfarm.run();
+
+    // Sort lexicographically by message text since Node streams buffer the text
+    // and order can't be guaranteed.
+    let sortByMessageText = messages =>
+      messages.slice().sort((e1, e2) => e1.message.localeCompare(e2.message));
+
+    assert.deepEqual(
+      sortByMessageText(events),
+      sortByMessageText([
+        {
+          level: 'info',
+          message: 'one',
+          type: 'log'
+        },
+        {
+          level: 'info',
+          message: 'two',
+          type: 'log'
+        },
+        {
+          level: 'error',
+          message: 'three',
+          type: 'log'
+        },
+        {
+          level: 'error',
+          message: 'four',
+          type: 'log'
+        },
+        {
+          level: 'error',
+          message: 'five',
+          type: 'log'
+        }
+      ])
+    );
+
+    logDisposable.dispose();
+    await workerfarm.end();
+  });
+
   it('Forwards logger events to the main process', async () => {
     let events = [];
     let logDisposable = Logger.onLog(event => events.push(event));
